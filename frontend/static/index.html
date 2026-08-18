@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ATS - Candidate Screening</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { --ink:#1F2A24; --muted:#8A8578; --line:#E7E3D8; --bg:#F6F4EF; --card:#FFFFFF;
+          --green-bg:#EAF4EC; --green-fg:#2B7A4B; --red-bg:#FBEAE8; --red-fg:#B54B3F;
+          --amber-bg:#FBF0DE; --amber-fg:#9A6A16; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; background: var(--ink); color: var(--bg);
+         padding: 4px 8px; border-radius: 4px; font-family: ui-monospace, monospace; }
+  .grid { display:grid; grid-template-columns: 340px 1fr; gap: 18px; align-items: start; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .grid > .card:first-child { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; }
+  .eyebrow { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color: var(--muted);
+             font-family: ui-monospace, monospace; margin-bottom: 12px; }
+  label { font-size: 12px; font-weight: 600; color:#5B5646; display:block; margin-bottom:4px; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+                             font-size: 13px; margin-bottom: 14px; font-family: inherit; }
+  textarea { resize: vertical; }
+  .drop { border: 2px dashed #D9D4C6; border-radius: 10px; padding: 26px; text-align:center; cursor:pointer; color: var(--muted); font-size: 13px; }
+  .drop.over { border-color: var(--ink); background:#F0EEE5; }
+  button { cursor:pointer; border:none; border-radius: 8px; font-size: 13px; font-weight: 600; }
+  .btn-dark { background: var(--ink); color: var(--bg); padding: 10px 16px; }
+  .btn-link { background:none; color: var(--red-fg); font-size: 11px; text-transform:uppercase; letter-spacing:.05em; padding:4px 8px; }
+  .pending { margin-top: 12px; background:#FAF8F2; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .pending-row { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; font-family: ui-monospace, monospace; }
+  .searchbar { display:flex; gap:8px; margin-bottom: 0; }
+  .searchbar input { margin-bottom:0; }
+  table { width:100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color: var(--muted);
+       padding: 8px 10px; border-bottom:1px solid #EFEBDF; border-top:1px solid #EFEBDF; }
+  td { padding: 10px; border-bottom: 1px solid #F1EEE3; }
+  tr.row { cursor:pointer; }
+  tr.row:hover { background: #FAF8F2; }
+  .score { padding:3px 10px; border-radius:999px; font-weight:600; font-size:12px; }
+  .chip { display:inline-block; font-size:11px; padding:4px 10px; border-radius:999px; margin: 2px; }
+  .chip-ok { background: var(--green-bg); color: var(--green-fg); }
+  .chip-miss { background: var(--red-bg); color: var(--red-fg); }
+  .chip-inferred { background: var(--amber-bg); color: var(--amber-fg); }
+  .detail { background:#FAF8F2; padding: 18px 20px; }
+  .x-btn { color: var(--red-fg); background:none; border:none; cursor:pointer; font-size:14px; }
+  .empty { text-align:center; color: var(--muted); padding: 40px 0; font-size: 13px; }
+  .head-row { display:flex; justify-content:space-between; align-items:center; }
+
+  /* ---- expanded candidate detail: skills + requirement checklist ---- */
+  .detailGrid { display:grid; grid-template-columns: 1.15fr 1fr; gap: 32px; }
+  @media (max-width: 820px) { .detailGrid { grid-template-columns: 1fr; } }
+  .eyebrow-sm { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color: var(--muted);
+                font-family: ui-monospace, monospace; margin: 0 0 8px; }
+  .eyebrow-sm:not(:first-child) { margin-top: 16px; }
+  .chipwrap { display:flex; flex-wrap:wrap; gap:2px; margin-bottom: 4px; }
+  .reqblock { margin-bottom: 16px; }
+  .reqlabel { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .reqsub { font-weight: 400; color: var(--muted); }
+  .reqdetail { font-size: 12px; color: var(--muted); margin-top: 3px; line-height:1.5; }
+  .reqmeta { font-size: 11px; color: #A39D8C; font-family: ui-monospace, monospace; margin-top: 2px; }
+  .aligntag { display:inline-block; font-size:10px; text-transform:uppercase; letter-spacing:.04em;
+              font-weight:700; padding:2px 7px; border-radius:999px; margin-left:6px; vertical-align:1px; }
+  .aligntag.good { background: var(--green-bg); color: var(--green-fg); }
+  .aligntag.bad { background: var(--red-bg); color: var(--red-fg); }
+  .aligntag.unknown { background:#F1EEE3; color:#8A8578; }
+  .warnbox { display:flex; gap:6px; align-items:flex-start; background: var(--red-bg); color: var(--red-fg);
+             border-radius: 7px; padding: 8px 10px; font-size: 11.5px; line-height:1.5; margin-top: 6px; }
+  .warnbox .wi { flex: none; }
+  .contactline { font-size: 13px; color: var(--ink); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Candidate Screening</h1>
+      <div class="sub">Set the role, drop in resumes, review matches.</div>
+    </div>
+    <span class="tag">RAG · ChromaDB</span>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: Job form + upload -->
+    <div class="card">
+      <div class="eyebrow">Job requirements</div>
+
+      <label>Paste a rough job description (optional)</label>
+      <textarea id="rawJobText" rows="4" placeholder="Paste the JD as-is - responsibilities, skills, years of experience, education, in any order. We'll auto-detect the fields below."></textarea>
+      <button class="btn-dark" style="width:100%; padding:8px; margin-bottom:16px;" onclick="autoDetectJob()" id="autoDetectBtn">Auto-detect requirements</button>
+
+      <label>Role title</label>
+      <input id="jobTitle" value="administrative assistant" />
+
+      <label>Required skills</label>
+      <textarea id="jobSkills" rows="4">Schedule and confirm appointments, Draft and proofread correspondence, Computer and technology knowledge, MS Office, Electronic mail, Answer telephone and relay messages</textarea>
+
+      <label>Minimum years of experience</label>
+      <input id="jobMinExp" type="number" value="2" />
+
+      <label>Required education</label>
+      <select id="jobEducation">
+        <option>No formal education stated</option>
+        <option>Certificate/Diploma (non-academic, e.g. course/bootcamp)</option>
+        <option>Matric / Secondary School</option>
+        <option>Intermediate / High School</option>
+        <option>Diploma (technical/associate)</option>
+        <option selected>Bachelor's</option>
+        <option>Master's</option>
+        <option>MPhil</option>
+        <option>PhD / Doctorate</option>
+      </select>
+
+      <button class="btn-dark" style="width:100%; padding:10px; margin-bottom:16px;" onclick="createJob()">Save job description</button>
+      <div class="sub" id="jobStatus"></div>
+
+      <label style="margin-top:8px;">Candidate resumes</label>
+      <div class="drop" id="drop">Drop multiple PDFs/DOCX here, or click to browse</div>
+      <input id="fileInput" type="file" multiple accept=".pdf,.docx" style="display:none" />
+
+      <div class="pending" id="pendingBox" style="display:none;">
+        <div class="eyebrow" id="pendingCount">Saved — not yet screened (0)</div>
+        <div id="pendingList"></div>
+        <button class="btn-dark" style="width:100%; padding:8px; margin-top:8px;" onclick="screenFiles()" id="screenBtn">Screen CVs</button>
+        <div class="sub" id="screenStatus" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Search + Candidate table -->
+    <div>
+      <div class="card" style="margin-bottom: 14px;">
+        <div class="eyebrow">Ask about your candidates</div>
+        <div class="searchbar">
+          <input id="searchQuery" placeholder='e.g. "who has led a team", "best cv for this job", "compare the top 2"' />
+          <button class="btn-dark" style="padding:10px 20px;" onclick="runSearch()">Search</button>
+        </div>
+        <div class="sub" id="searchStatus" style="margin-top:6px;"></div>
+        <div id="searchAnswer" style="display:none; margin-top:10px; padding:12px 14px; background:#F7F5EE; border:1px solid #E7E2D3; border-radius:8px; font-size:13px; line-height:1.6; color:#3A362C;"></div>
+      </div>
+
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div class="head-row" style="padding: 16px 18px 6px;">
+          <div class="eyebrow" id="candCount" style="margin-bottom:0;">Candidates (0)</div>
+          <button class="btn-link" onclick="deleteAll()">Delete all</button>
+        </div>
+        <div id="tableWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = ""; // same-origin
+const API_KEY = "changeme"; // matches .env ATS_API_KEY for demo purposes
+
+let currentJobId = null;
+let candidates = [];
+
+// ---- Turn a raw backend error message into something an HR user can act on.
+// The backend already returns the real error text (e.g. a Gemini quota
+// message) unchanged — this only decides how to *display* it, it doesn't
+// touch what triggers the error or how the backend classifies it.
+function friendlyApiError(raw) {
+  const msg = (raw || "").toString();
+  if (/RESOURCE_EXHAUSTED|429|quota/i.test(msg)) {
+    const m = msg.match(/retry\s*(?:in|Delay)['":\s]*~?(\d+(?:\.\d+)?)s/i);
+    const wait = m ? Math.ceil(parseFloat(m[1])) : null;
+    return wait
+      ? `The AI service has hit its rate limit — wait about ${wait}s and try again.`
+      : "The AI service has hit its rate limit for now — wait a bit and try again.";
+  }
+  if (msg.length > 180) return "Something went wrong talking to the AI service. Please try again.";
+  return msg || "Something went wrong. Please try again.";
+}
+
+// ---- Auto-detect job requirements from pasted rough text ----
+async function autoDetectJob() {
+  const rawText = document.getElementById("rawJobText").value.trim();
+  if (!rawText) { alert("Paste a rough job description first."); return; }
+  const btn = document.getElementById("autoDetectBtn");
+  btn.disabled = true; btn.innerText = "Detecting…";
+  const res = await fetch(`${API}/jobs/parse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify({ raw_text: rawText }),
+  });
+  btn.disabled = false; btn.innerText = "Auto-detect requirements";
+  const data = await res.json();
+  if (!res.ok) { document.getElementById("jobStatus").innerText = friendlyApiError(data.error?.message); return; }
+
+  document.getElementById("jobTitle").value = data.job_title || "";
+  document.getElementById("jobSkills").value = (data.required_skills || []).join(", ");
+  document.getElementById("jobMinExp").value = data.minimum_experience ?? 0;
+  const eduSelect = document.getElementById("jobEducation");
+  if ([...eduSelect.options].some(o => o.value === data.education_requirement)) {
+    eduSelect.value = data.education_requirement;
+  }
+  document.getElementById("jobStatus").innerText = "Detected — review the fields above, then save.";
+}
+
+// ---- Job creation ----
+async function createJob() {
+  const body = {
+    job_title: document.getElementById("jobTitle").value,
+    required_skills: document.getElementById("jobSkills").value.split(",").map(s => s.trim()).filter(Boolean),
+    minimum_experience: parseFloat(document.getElementById("jobMinExp").value || "0"),
+    education_requirement: document.getElementById("jobEducation").value,
+    job_description: document.getElementById("jobSkills").value,
+  };
+  const res = await fetch(`${API}/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    currentJobId = data.job_id;
+    document.getElementById("jobStatus").innerText = `Saved as ${data.job_id}`;
+    await enrichComparisons();
+  } else {
+    document.getElementById("jobStatus").innerText = friendlyApiError(data.error?.message);
+  }
+}
+
+// ---- Upload (save only) ----
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("fileInput");
+drop.onclick = () => fileInput.click();
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); handleFiles(e.dataTransfer.files); };
+fileInput.onchange = (e) => handleFiles(e.target.files);
+
+async function handleFiles(fileList) {
+  const form = new FormData();
+  for (const f of fileList) form.append("files", f);
+  const res = await fetch(`${API}/resumes/upload`, { method: "POST", body: form });
+  const saved = await res.json();
+  if (res.ok) {
+    await refreshPending();
+  }
+}
+
+async function refreshPending() {
+  const res = await fetch(`${API}/resumes/pending`);
+  const pending = await res.json();
+  const box = document.getElementById("pendingBox");
+  const list = document.getElementById("pendingList");
+  document.getElementById("pendingCount").innerText = `Saved — not yet screened (${pending.length})`;
+  box.style.display = pending.length ? "block" : "none";
+  list.innerHTML = pending.map(p => `
+    <div class="pending-row">
+      <span>${p.filename}</span>
+      <button class="x-btn" onclick="deletePending('${p.file_id}')">✕</button>
+    </div>`).join("");
+}
+
+async function deletePending(fileId) {
+  await fetch(`${API}/resumes/pending/${fileId}`, { method: "DELETE" });
+  await refreshPending();
+}
+
+async function screenFiles() {
+  const btn = document.getElementById("screenBtn");
+  const status = document.getElementById("screenStatus");
+  btn.disabled = true; btn.innerText = "Screening…"; status.innerText = "";
+  const res = await fetch(`${API}/resumes/screen`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify({ applied_job_id: currentJobId }),
+  });
+  btn.disabled = false; btn.innerText = "Screen CVs";
+  if (res.ok) {
+    const data = await res.json();
+    // Successfully screened CVs are already on the dashboard (added below).
+    // Anything not screened - failed or not yet reached because an API
+    // quota/rate limit stopped the batch early - is left completely
+    // untouched in "pending", so it stays right here in this same list and
+    // "Screen CVs" can just be pressed again later to pick up where it left off.
+    if (data.pending_remaining > 0 || data.failed_count > 0) {
+      const parts = [`${data.screened_count} of ${data.total_files} screened`];
+      if (data.stopped_early) parts.push(`${data.pending_remaining} left — API limit reached, press Screen CVs again shortly`);
+      else if (data.pending_remaining > 0) parts.push(`${data.pending_remaining} left in pending`);
+      if (data.failed_count > 0) parts.push(`${data.failed_count} failed (see pending list, retry)`);
+      status.innerText = parts.join(" — ");
+    } else {
+      status.innerText = `All ${data.screened_count} CVs screened.`;
+    }
+    await refreshPending();
+    await loadCandidates();
+    await enrichComparisons();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    status.innerText = friendlyApiError(data.error?.message) || "Screening failed. Try again.";
+  }
+}
+
+// ---- Candidate table ----
+async function loadCandidates() {
+  const res = await fetch(`${API}/resumes`);
+  candidates = await res.json();
+  renderTable(candidates);
+}
+
+// ---- Pull in the role/skill/education comparison against the saved job ----
+// Uses the existing /search endpoint (same one behind the search bar) so
+// every screened candidate's requirement checklist has role_alignment,
+// matched_skills, missing_skills and education_match filled in as soon as
+// a job is saved — no separate scoring logic, just calling what's already there.
+async function enrichComparisons() {
+  if (!currentJobId || !candidates.length) return;
+  const status = document.getElementById("searchStatus");
+  try {
+    const res = await fetch(`${API}/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+      // show_all=true -> exhaustive list_resumes() on the backend, not an
+      // approximate ANN vector search. top_k-based retrieval can silently
+      // return fewer than requested candidates (HNSW is approximate), so
+      // every screened candidate must go through show_all to guarantee none
+      // are dropped from scoring.
+      body: JSON.stringify({ job_id: currentJobId, query: "Evaluate every candidate against this role.", show_all: true }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (status) status.innerText = friendlyApiError(data.error?.message);
+      return;
+    }
+    if (status) status.innerText = "";
+    const data = await res.json();
+    const byId = Object.fromEntries(data.results.map(r => [r.resume_id, r]));
+    candidates = candidates.map(c => ({ ...c, ...(byId[c.resume_id] || {}) }));
+    // Merging by original candidates[] order threw away the backend's sort -
+    // re-sort here: best score first, tie -> more total experience first.
+    candidates.sort((a, b) => {
+      const aNoScore = a.score === null || a.score === undefined;
+      const bNoScore = b.score === null || b.score === undefined;
+      if (aNoScore !== bNoScore) return aNoScore ? 1 : -1;
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      return (b.total_experience || 0) - (a.total_experience || 0);
+    });
+    renderTable(candidates);
+  } catch (err) {
+    // silent — table still shows base candidate data if comparison call fails
+  }
+}
+
+function scoreClass(score) {
+  if (score === null || score === undefined) return { bg: "#F1EEE3", fg: "#8A8578" };
+  if (score >= 70) return { bg: "#EAF4EC", fg: "#2B7A4B" };
+  if (score >= 40) return { bg: "#FBF0DE", fg: "#9A6A16" };
+  return { bg: "#FBEAE8", fg: "#B54B3F" };
+}
+
+function renderTable(rows) {
+  document.getElementById("candCount").innerText = `Candidates (${rows.length})`;
+  const wrap = document.getElementById("tableWrap");
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty">No candidates yet — upload and screen resumes on the left.</div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th></th><th>Full name</th><th>Detected role</th><th>Experience</th><th>Education</th><th>Score</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(c => rowHtml(c)).join("")}
+      </tbody>
+    </table>`;
+}
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.innerText = str ?? "";
+  return d.innerHTML;
+}
+
+function rowHtml(c) {
+  const sc = scoreClass(c.score);
+  const scoreLabel = c.score === null || c.score === undefined ? "—" : `${c.score}%`;
+  const eduLevel = c.highest_education_level || "—";
+  const eduClass = /Certificate|No formal/.test(eduLevel) ? "chip-miss" : "chip-ok";
+  return `
+    <tr class="row" onclick="toggleDetail('${c.resume_id}')">
+      <td>▸</td>
+      <td>${escapeHtml(c.full_name) || "(unparsed)"}<br/><span style="font-family:ui-monospace,monospace;font-size:11px;color:#A39D8C;">${c.resume_file_path ? escapeHtml(c.resume_file_path.split("/").pop()) : ""}</span></td>
+      <td>${escapeHtml(c.detected_job_title) || "—"}</td>
+      <td>${c.total_experience} yrs <span style="color:#A39D8C;font-size:11px;">(${c.experience_source})</span></td>
+      <td><span class="chip ${eduClass}" style="margin:0;">${escapeHtml(eduLevel)}</span></td>
+      <td><span class="score" style="background:${sc.bg};color:${sc.fg};">${scoreLabel}</span></td>
+      <td><button class="x-btn" onclick="event.stopPropagation(); deleteCandidate('${c.resume_id}')">✕</button></td>
+    </tr>
+    <tr id="detail-${c.resume_id}" style="display:none;">
+      <td colspan="7" class="detail">
+        ${detailHtml(c)}
+      </td>
+    </tr>`;
+}
+
+// ---- Expanded row: skills ledger (left) + requirement checklist (right) ----
+// Every value here is read straight off the candidate object as already
+// returned by the backend (/resumes and, once a job is saved, /search) —
+// this function only decides how to lay it out and label it.
+function detailHtml(c) {
+  const jobSkills = document.getElementById("jobSkills").value.split(",").map(s => s.trim()).filter(Boolean);
+  const jobTitle = document.getElementById("jobTitle").value.trim();
+  const jobEducation = document.getElementById("jobEducation").value;
+  const jobMinExp = document.getElementById("jobMinExp").value;
+
+  // --- skills: prefer the job-scored matched/missing lists from /search.
+  // Fallback (no /search run yet) must STILL only ever judge the JD's own
+  // required skills - one entry per job skill, explicit/inferred/missing -
+  // never the candidate's whole skills_explicit + skills_inferred list.
+  let matched, missing;
+  if (c.matched_skills) {
+    matched = c.matched_skills; // [{skill, match_type: exact|related, evidence}]
+    missing = c.missing_skills || [];
+  } else {
+    const explicit = (c.skills_explicit || []).map(s => s.toLowerCase());
+    const inferred = c.skills_inferred || [];
+    matched = [];
+    missing = [];
+    jobSkills.forEach(reqSkill => {
+      const needle = reqSkill.toLowerCase();
+      const explicitHit = explicit.some(s => s.includes(needle) || needle.includes(s));
+      const inferredHit = inferred.find(s => {
+        const sk = (s.skill || "").toLowerCase();
+        return sk.includes(needle) || needle.includes(sk);
+      });
+      if (explicitHit) {
+        matched.push({ skill: reqSkill, match_type: "exact" });
+      } else if (inferredHit) {
+        matched.push({ skill: reqSkill, match_type: "related", evidence: inferredHit.evidence });
+      } else {
+        missing.push(reqSkill);
+      }
+    });
+  }
+  const exact = matched.filter(m => m.match_type === "exact");
+  const related = matched.filter(m => m.match_type !== "exact");
+  const totalRequired = jobSkills.length || matched.length + missing.length;
+
+  const skillsCol = `
+    <div class="eyebrow-sm">Skills — ${matched.length} of ${totalRequired} matched</div>
+    <div class="chipwrap">
+      ${exact.map(s => `<span class="chip chip-ok" title="Match">${escapeHtml(s.skill)}</span>`).join("")}
+    </div>
+    ${related.length ? `
+      <div class="eyebrow-sm">Inferred skills (semantic match)</div>
+      <div class="chipwrap">
+        ${related.map(s => `<span class="chip chip-inferred" title="Inferred">${escapeHtml(s.skill)}</span>`).join("")}
+      </div>` : ""}
+    ${missing.length ? `
+      <div class="eyebrow-sm">Missing skills</div>
+      <div class="chipwrap">
+        ${missing.map(s => `<span class="chip chip-miss" title="Missed">${escapeHtml(s)}</span>`).join("")}
+      </div>` : ""}
+  `;
+
+  // --- role: posted vs detected, tagged only when the backend has already judged it ---
+  const alignMap = { aligned: ["good", "Aligned"], different_field: ["bad", "Different field"], unknown: ["unknown", "Unknown"] };
+  const [alignClass, alignLabel] = alignMap[c.role_alignment] || [null, null];
+  const roleBlock = `
+    <div class="reqblock">
+      <div class="reqlabel">Role <span class="reqsub">— posted as "${escapeHtml(jobTitle) || "—"}"</span></div>
+      <div class="reqdetail">
+        Detected: ${escapeHtml(c.detected_job_title) || "—"}
+        ${alignClass ? `<span class="aligntag ${alignClass}">${alignLabel}</span>` : ""}
+      </div>
+      ${c.role_alignment === "different_field" && c.explanation ? `
+        <div class="warnbox"><span class="wi">⚠</span><span>${escapeHtml(c.explanation)}</span></div>` : ""}
+    </div>`;
+
+  // --- education: required vs detected, tagged only when the backend has already judged it ---
+  const eduTag = c.education_match === true ? `<span class="aligntag good">Meets</span>`
+    : c.education_match === false ? `<span class="aligntag bad">Below</span>` : "";
+  const eduBlock = `
+    <div class="reqblock">
+      <div class="reqlabel">Education <span class="reqsub">— requires ${escapeHtml(jobEducation)}</span></div>
+      <div class="reqdetail">
+        ${escapeHtml(c.highest_education_detail) || escapeHtml(c.highest_education_level) || "—"} → ${escapeHtml(c.highest_education_level) || "—"}
+        ${eduTag}
+      </div>
+    </div>`;
+
+  // --- experience: required vs detected, plus EVERY role's dates behind the
+  // number (not just the first one) - however many roles the candidate has.
+  const roles = c.work_history || [];
+  const expSourceText = c.experience_source === "stated"
+    ? "stated directly in resume"
+    : `computed${roles.length ? ` from ${roles.length} role${roles.length > 1 ? "s" : ""} (dates normalized)` : ""}`;
+  const roleRows = roles.map(r => {
+    const hasDates = (r.start_date_raw || "").trim() && (r.end_date_raw || "").trim();
+    const dateText = hasDates
+      ? `${escapeHtml(r.start_date_raw)} → ${escapeHtml(r.end_date_raw)}`
+      : (r.duration_raw ? `${escapeHtml(r.duration_raw)} stated (no dates given)` : "no dates or duration given");
+    return `<div class="reqmeta">${escapeHtml(r.title) || "—"} @ ${escapeHtml(r.company) || "—"}: ${dateText}</div>`;
+  }).join("");
+  const expBlock = `
+    <div class="reqblock">
+      <div class="reqlabel">Experience <span class="reqsub">— requires ${escapeHtml(jobMinExp)}+ yrs</span></div>
+      <div class="reqdetail">${c.total_experience} yrs found — ${expSourceText}</div>
+      ${roleRows}
+    </div>`;
+
+  const reqCol = `
+    <div class="eyebrow-sm">Requirement checklist</div>
+    ${roleBlock}
+    ${eduBlock}
+    ${expBlock}
+    <div class="eyebrow-sm">Contact</div>
+    <div class="contactline">${escapeHtml(c.email) || "—"}</div>
+    <div class="contactline">${escapeHtml(c.phone) || "—"}</div>
+  `;
+
+  return `<div class="detailGrid"><div>${skillsCol}</div><div>${reqCol}</div></div>`;
+}
+
+function toggleDetail(id) {
+  const el = document.getElementById(`detail-${id}`);
+  el.style.display = el.style.display === "none" ? "table-row" : "none";
+}
+
+async function deleteCandidate(id) {
+  await fetch(`${API}/resumes/${id}`, { method: "DELETE", headers: { "X-API-Key": API_KEY } });
+  await loadCandidates();
+}
+
+async function deleteAll() {
+  await fetch(`${API}/resumes`, { method: "DELETE", headers: { "X-API-Key": API_KEY } });
+  await loadCandidates();
+}
+
+// ---- Search (RAG + LLM scoring) ----
+async function runSearch() {
+  if (!currentJobId) { alert("Save a job description first."); return; }
+  const query = document.getElementById("searchQuery").value;
+  const status = document.getElementById("searchStatus");
+  const answerBox = document.getElementById("searchAnswer");
+  status.innerText = "";
+  answerBox.style.display = "none";
+  answerBox.innerHTML = "";
+  const res = await fetch(`${API}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    // show_all=true covers every screened candidate via the backend's
+    // exhaustive list_resumes() path, not just the nearest N by embedding
+    // similarity - everyone gets a score (0 included), never silently
+    // dropped from the results just for ranking low on the query. A
+    // top_k-based ANN query can return fewer than requested even when
+    // top_k >= total candidates, since HNSW search is approximate.
+    body: JSON.stringify({ job_id: currentJobId, query, show_all: true }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    // merge scored results into the full candidate metadata for display
+    const byId = Object.fromEntries(candidates.map(c => [c.resume_id, c]));
+    const merged = data.results.map(r => ({ ...byId[r.resume_id], ...r }));
+    merged.sort((a, b) => {
+      const aNoScore = a.score === null || a.score === undefined;
+      const bNoScore = b.score === null || b.score === undefined;
+      if (aNoScore !== bNoScore) return aNoScore ? 1 : -1;
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      return (b.total_experience || 0) - (a.total_experience || 0);
+    });
+    renderTable(merged);
+    if (data.answer) {
+      answerBox.innerHTML = String(data.answer).split("\n").map(l => l ? `<div>${escapeHtml(l)}</div>` : `<div>&nbsp;</div>`).join("");
+      answerBox.style.display = "block";
+      // In-scope answers are grounded in the ranked results, so surface the
+      // top-scoring candidate's full detail automatically instead of making
+      // HR click it - same detail row the table already renders for every
+      // candidate (rowHtml/detailHtml).
+      if (data.in_scope && merged.length) {
+        const detailRow = document.getElementById(`detail-${merged[0].resume_id}`);
+        if (detailRow) {
+          detailRow.style.display = "table-row";
+          detailRow.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }
+  } else {
+    status.innerText = friendlyApiError(data.error?.message);
+  }
+}
+
+// ---- On load: restore the most recently saved job (currentJobId only ever
+// lived in JS memory before, so a page refresh silently lost it and every
+// candidate fell back to the client-side approximation instead of real
+// backend scores) - then pull real matched_skills/score for every candidate.
+async function restoreJob() {
+  try {
+    const res = await fetch(`${API}/jobs`, { headers: { "X-API-Key": API_KEY } });
+    if (!res.ok) return;
+    const jobs = await res.json();
+    if (!jobs.length) return;
+    const job = jobs.filter(j => j.status === "active").sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))[0]
+      || jobs.sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))[0];
+    if (!job) return;
+    currentJobId = job.job_id;
+    document.getElementById("jobTitle").value = job.job_title || "";
+    document.getElementById("jobSkills").value = (job.required_skills || []).join(", ");
+    document.getElementById("jobMinExp").value = job.minimum_experience ?? 0;
+    const eduSelect = document.getElementById("jobEducation");
+    if ([...eduSelect.options].some(o => o.value === job.education_requirement)) {
+      eduSelect.value = job.education_requirement;
+    }
+    document.getElementById("jobStatus").innerText = `Loaded saved job ${job.job_id}`;
+  } catch (err) {
+    // silent — form just stays empty, HR can save a fresh job description
+  }
+}
+
+refreshPending();
+(async () => {
+  await restoreJob();
+  await loadCandidates();
+  await enrichComparisons();
+})();
+</script>
+</body>
+</html>

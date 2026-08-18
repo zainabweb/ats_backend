@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ATS - Candidate Screening</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { --ink:#1F2A24; --muted:#8A8578; --line:#E7E3D8; --bg:#F6F4EF; --card:#FFFFFF;
+          --green-bg:#EAF4EC; --green-fg:#2B7A4B; --red-bg:#FBEAE8; --red-fg:#B54B3F; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; background: var(--ink); color: var(--bg);
+         padding: 4px 8px; border-radius: 4px; font-family: ui-monospace, monospace; }
+  .grid { display:grid; grid-template-columns: 340px 1fr; gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .eyebrow { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color: var(--muted);
+             font-family: ui-monospace, monospace; margin-bottom: 12px; }
+  label { font-size: 12px; font-weight: 600; color:#5B5646; display:block; margin-bottom:4px; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+                             font-size: 13px; margin-bottom: 14px; font-family: inherit; }
+  textarea { resize: vertical; }
+  .drop { border: 2px dashed #D9D4C6; border-radius: 10px; padding: 26px; text-align:center; cursor:pointer; color: var(--muted); font-size: 13px; }
+  .drop.over { border-color: var(--ink); background:#F0EEE5; }
+  button { cursor:pointer; border:none; border-radius: 8px; font-size: 13px; font-weight: 600; }
+  .btn-dark { background: var(--ink); color: var(--bg); padding: 10px 16px; }
+  .btn-link { background:none; color: var(--red-fg); font-size: 11px; text-transform:uppercase; letter-spacing:.05em; padding:4px 8px; }
+  .pending { margin-top: 12px; background:#FAF8F2; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .pending-row { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; font-family: ui-monospace, monospace; }
+  .searchbar { display:flex; gap:8px; margin-bottom: 0; }
+  .searchbar input { margin-bottom:0; }
+  table { width:100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color: var(--muted);
+       padding: 8px 10px; border-bottom:1px solid #EFEBDF; border-top:1px solid #EFEBDF; }
+  td { padding: 10px; border-bottom: 1px solid #F1EEE3; }
+  tr.row { cursor:pointer; }
+  tr.row:hover { background: #FAF8F2; }
+  .score { padding:3px 10px; border-radius:999px; font-weight:600; font-size:12px; }
+  .chip { display:inline-block; font-size:11px; padding:4px 10px; border-radius:999px; margin: 2px; }
+  .chip-ok { background: var(--green-bg); color: var(--green-fg); }
+  .chip-miss { background: var(--red-bg); color: var(--red-fg); }
+  .detail { background:#FAF8F2; padding: 16px; }
+  .x-btn { color: var(--red-fg); background:none; border:none; cursor:pointer; font-size:14px; }
+  .empty { text-align:center; color: var(--muted); padding: 40px 0; font-size: 13px; }
+  .head-row { display:flex; justify-content:space-between; align-items:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Candidate Screening</h1>
+      <div class="sub">Set the role, drop in resumes, review matches.</div>
+    </div>
+    <span class="tag">RAG · ChromaDB</span>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: Job form + upload -->
+    <div class="card">
+      <div class="eyebrow">Job requirements</div>
+
+      <label>Paste a rough job description (optional)</label>
+      <textarea id="rawJobText" rows="4" placeholder="Paste the JD as-is - responsibilities, skills, years of experience, education, in any order. We'll auto-detect the fields below."></textarea>
+      <button class="btn-dark" style="width:100%; padding:8px; margin-bottom:16px;" onclick="autoDetectJob()" id="autoDetectBtn">Auto-detect requirements</button>
+
+      <label>Role title</label>
+      <input id="jobTitle" value="administrative assistant" />
+
+      <label>Required skills</label>
+      <textarea id="jobSkills" rows="4">Schedule and confirm appointments, Draft and proofread correspondence, Computer and technology knowledge, MS Office, Electronic mail, Answer telephone and relay messages</textarea>
+
+      <label>Minimum years of experience</label>
+      <input id="jobMinExp" type="number" value="2" />
+
+      <label>Required education</label>
+      <select id="jobEducation">
+        <option>No formal education stated</option>
+        <option>Certificate/Diploma (non-academic, e.g. course/bootcamp)</option>
+        <option>Matric / Secondary School</option>
+        <option>Intermediate / High School</option>
+        <option>Diploma (technical/associate)</option>
+        <option selected>Bachelor's</option>
+        <option>Master's</option>
+        <option>MPhil</option>
+        <option>PhD / Doctorate</option>
+      </select>
+
+      <button class="btn-dark" style="width:100%; padding:10px; margin-bottom:16px;" onclick="createJob()">Save job description</button>
+      <div class="sub" id="jobStatus"></div>
+
+      <label style="margin-top:8px;">Candidate resumes</label>
+      <div class="drop" id="drop">Drop multiple PDFs/DOCX here, or click to browse</div>
+      <input id="fileInput" type="file" multiple accept=".pdf,.docx" style="display:none" />
+
+      <div class="pending" id="pendingBox" style="display:none;">
+        <div class="eyebrow" id="pendingCount">Saved — not yet screened (0)</div>
+        <div id="pendingList"></div>
+        <button class="btn-dark" style="width:100%; padding:8px; margin-top:8px;" onclick="screenFiles()" id="screenBtn">Screen CVs</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Search + Candidate table -->
+    <div>
+      <div class="card" style="margin-bottom: 14px;">
+        <div class="eyebrow">Ask about your candidates</div>
+        <div class="searchbar">
+          <input id="searchQuery" placeholder='e.g. "who has led a team" or "anyone with fintech experience"' />
+          <button class="btn-dark" style="padding:10px 20px;" onclick="runSearch()">Search</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div class="head-row" style="padding: 16px 18px 6px;">
+          <div class="eyebrow" id="candCount" style="margin-bottom:0;">Candidates (0)</div>
+          <button class="btn-link" onclick="deleteAll()">Delete all</button>
+        </div>
+        <div id="tableWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = ""; // same-origin
+const API_KEY = "changeme"; // matches .env ATS_API_KEY for demo purposes
+
+let currentJobId = null;
+let candidates = [];
+
+// ---- Auto-detect job requirements from pasted rough text ----
+async function autoDetectJob() {
+  const rawText = document.getElementById("rawJobText").value.trim();
+  if (!rawText) { alert("Paste a rough job description first."); return; }
+  const btn = document.getElementById("autoDetectBtn");
+  btn.disabled = true; btn.innerText = "Detecting…";
+  const res = await fetch(`${API}/jobs/parse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify({ raw_text: rawText }),
+  });
+  btn.disabled = false; btn.innerText = "Auto-detect requirements";
+  const data = await res.json();
+  if (!res.ok) { document.getElementById("jobStatus").innerText = data.error?.message || "Auto-detect failed."; return; }
+
+  document.getElementById("jobTitle").value = data.job_title || "";
+  document.getElementById("jobSkills").value = (data.required_skills || []).join(", ");
+  document.getElementById("jobMinExp").value = data.minimum_experience ?? 0;
+  const eduSelect = document.getElementById("jobEducation");
+  if ([...eduSelect.options].some(o => o.value === data.education_requirement)) {
+    eduSelect.value = data.education_requirement;
+  }
+  document.getElementById("jobStatus").innerText = "Detected — review the fields above, then save.";
+}
+
+// ---- Job creation ----
+async function createJob() {
+  const body = {
+    job_title: document.getElementById("jobTitle").value,
+    required_skills: document.getElementById("jobSkills").value.split(",").map(s => s.trim()).filter(Boolean),
+    minimum_experience: parseFloat(document.getElementById("jobMinExp").value || "0"),
+    education_requirement: document.getElementById("jobEducation").value,
+    job_description: document.getElementById("jobSkills").value,
+  };
+  const res = await fetch(`${API}/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    currentJobId = data.job_id;
+    document.getElementById("jobStatus").innerText = `Saved as ${data.job_id}`;
+  } else {
+    document.getElementById("jobStatus").innerText = data.error?.message || "Failed to save job.";
+  }
+}
+
+// ---- Upload (save only) ----
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("fileInput");
+drop.onclick = () => fileInput.click();
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); handleFiles(e.dataTransfer.files); };
+fileInput.onchange = (e) => handleFiles(e.target.files);
+
+async function handleFiles(fileList) {
+  const form = new FormData();
+  for (const f of fileList) form.append("files", f);
+  const res = await fetch(`${API}/resumes/upload`, { method: "POST", body: form });
+  const saved = await res.json();
+  if (res.ok) {
+    await refreshPending();
+  }
+}
+
+async function refreshPending() {
+  const res = await fetch(`${API}/resumes/pending`);
+  const pending = await res.json();
+  const box = document.getElementById("pendingBox");
+  const list = document.getElementById("pendingList");
+  document.getElementById("pendingCount").innerText = `Saved — not yet screened (${pending.length})`;
+  box.style.display = pending.length ? "block" : "none";
+  list.innerHTML = pending.map(p => `
+    <div class="pending-row">
+      <span>${p.filename}</span>
+      <button class="x-btn" onclick="deletePending('${p.file_id}')">✕</button>
+    </div>`).join("");
+}
+
+async function deletePending(fileId) {
+  await fetch(`${API}/resumes/pending/${fileId}`, { method: "DELETE" });
+  await refreshPending();
+}
+
+async function screenFiles() {
+  const btn = document.getElementById("screenBtn");
+  btn.disabled = true; btn.innerText = "Screening…";
+  const res = await fetch(`${API}/resumes/screen`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify({ applied_job_id: currentJobId }),
+  });
+  btn.disabled = false; btn.innerText = "Screen CVs";
+  if (res.ok) {
+    await refreshPending();
+    await loadCandidates();
+  }
+}
+
+// ---- Candidate table ----
+async function loadCandidates() {
+  const res = await fetch(`${API}/resumes`);
+  candidates = await res.json();
+  renderTable(candidates);
+}
+
+function scoreClass(score) {
+  if (score === null || score === undefined) return { bg: "#F1EEE3", fg: "#8A8578" };
+  if (score >= 70) return { bg: "#EAF4EC", fg: "#2B7A4B" };
+  if (score >= 40) return { bg: "#FBF0DE", fg: "#9A6A16" };
+  return { bg: "#FBEAE8", fg: "#B54B3F" };
+}
+
+function renderTable(rows) {
+  document.getElementById("candCount").innerText = `Candidates (${rows.length})`;
+  const wrap = document.getElementById("tableWrap");
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty">No candidates yet — upload and screen resumes on the left.</div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th></th><th>Full name</th><th>Detected role</th><th>Experience</th><th>Education</th><th>Score</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(c => rowHtml(c)).join("")}
+      </tbody>
+    </table>`;
+}
+
+function rowHtml(c) {
+  const sc = scoreClass(c.score);
+  const scoreLabel = c.score === null || c.score === undefined ? "—" : `${c.score}%`;
+  const eduLevel = c.highest_education_level || "—";
+  const eduClass = /Certificate|No formal/.test(eduLevel) ? "chip-miss" : "chip-ok";
+  const explicitSkills = c.skills_explicit || [];
+  const inferredSkills = (c.skills_inferred || []).map(s => s.skill);
+  return `
+    <tr class="row" onclick="toggleDetail('${c.resume_id}')">
+      <td>▸</td>
+      <td>${c.full_name || "(unparsed)"}<br/><span style="font-family:ui-monospace,monospace;font-size:11px;color:#A39D8C;">${c.resume_file_path ? c.resume_file_path.split("/").pop() : ""}</span></td>
+      <td>${c.detected_job_title || "—"}</td>
+      <td>${c.total_experience} yrs <span style="color:#A39D8C;font-size:11px;">(${c.experience_source})</span></td>
+      <td><span class="chip ${eduClass}" style="margin:0;">${eduLevel}</span></td>
+      <td><span class="score" style="background:${sc.bg};color:${sc.fg};">${scoreLabel}</span></td>
+      <td><button class="x-btn" onclick="event.stopPropagation(); deleteCandidate('${c.resume_id}')">✕</button></td>
+    </tr>
+    <tr id="detail-${c.resume_id}" style="display:none;">
+      <td colspan="7" class="detail">
+        <strong>Explicit skills:</strong><br/>
+        ${explicitSkills.map(s => `<span class="chip chip-ok">${s}</span>`).join("")}
+        ${inferredSkills.length ? `<br/><br/><strong>Inferred skills (semantic):</strong><br/>${inferredSkills.map(s => `<span class="chip chip-ok" style="opacity:.75;">${s} ~</span>`).join("")}` : ""}
+        ${(c.missing_skills || []).length ? `<br/><br/><strong>Missing:</strong><br/>${c.missing_skills.map(s => `<span class="chip chip-miss">${s}</span>`).join("")}` : ""}
+        <br/><br/>
+        <strong>Highest education:</strong> ${c.highest_education_detail || "—"} (${eduLevel})<br/>
+        <strong>Email:</strong> ${c.email || "—"} &nbsp; <strong>Phone:</strong> ${c.phone || "—"}
+        ${c.explanation ? `<br/><br/><strong>Notes:</strong> ${c.explanation}` : ""}
+      </td>
+    </tr>`;
+}
+
+function toggleDetail(id) {
+  const el = document.getElementById(`detail-${id}`);
+  el.style.display = el.style.display === "none" ? "table-row" : "none";
+}
+
+async function deleteCandidate(id) {
+  await fetch(`${API}/resumes/${id}`, { method: "DELETE", headers: { "X-API-Key": API_KEY } });
+  await loadCandidates();
+}
+
+async function deleteAll() {
+  await fetch(`${API}/resumes`, { method: "DELETE", headers: { "X-API-Key": API_KEY } });
+  await loadCandidates();
+}
+
+// ---- Search (RAG + LLM scoring) ----
+async function runSearch() {
+  if (!currentJobId) { alert("Save a job description first."); return; }
+  const query = document.getElementById("searchQuery").value;
+  const res = await fetch(`${API}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify({ job_id: currentJobId, query, top_k: 5 }),
+  });
+  const results = await res.json();
+  if (res.ok) {
+    // merge scored results into the full candidate metadata for display
+    const byId = Object.fromEntries(candidates.map(c => [c.resume_id, c]));
+    const merged = results.map(r => ({ ...byId[r.resume_id], ...r }));
+    renderTable(merged);
+  }
+}
+
+refreshPending();
+loadCandidates();
+</script>
+</body>
+</html>

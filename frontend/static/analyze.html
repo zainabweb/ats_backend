@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Resume Scan — ATS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #ECEEF3;
+    --card: #FFFFFF;
+    --ink: #10192E;
+    --muted: #667085;
+    --line: #D7DBE3;
+    --explicit: #0F8A5F;
+    --explicit-bg: #E4F4EC;
+    --inferred: #B9790C;
+    --inferred-bg: #FBF0DC;
+    --missing: #C13B2E;
+    --missing-bg: #FBE7E4;
+    --scan: #2453FF;
+    --scan-dim: #E8ECFF;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .tag {
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    background: var(--ink); color: var(--paper); padding: 4px 9px; border-radius: 3px;
+  }
+
+  .grid { display: grid; grid-template-columns: 360px 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+  .eyebrow {
+    font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .eyebrow .n { width: 16px; height: 16px; border-radius: 50%; background: var(--line); color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; }
+
+  label { font-size: 11.5px; font-weight: 600; color: #3A4256; display: block; margin-bottom: 5px; }
+  .hint { font-size: 11px; color: var(--muted); margin: -3px 0 8px; }
+  textarea, input {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px;
+    font-size: 13px; margin-bottom: 15px; font-family: inherit; background: #FCFCFD; color: var(--ink);
+  }
+  textarea { resize: vertical; line-height: 1.5; }
+  textarea:focus, input:focus { outline: 2px solid var(--scan); outline-offset: 1px; border-color: transparent; }
+
+  /* --- signature: scanner sweep over the pasted resume --- */
+  .intake-doc { position: relative; overflow: hidden; border-radius: 7px; margin-bottom: 15px; }
+  .intake-doc textarea { margin-bottom: 0; display: block; }
+  .scanline {
+    position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--scan), transparent);
+    box-shadow: 0 0 10px 2px var(--scan);
+    opacity: 0; pointer-events: none;
+  }
+  .scanning .scanline { animation: sweep 1.1s ease-in-out; }
+  @keyframes sweep {
+    0% { top: 0; opacity: 0; }
+    8% { opacity: 1; }
+    92% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .scanning .scanline { animation: none; } }
+
+  button { cursor: pointer; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; font-family: inherit; }
+  .btn-scan {
+    width: 100%; padding: 11px; background: var(--ink); color: var(--paper);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-scan:disabled { opacity: .55; cursor: default; }
+  .btn-scan .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--scan); }
+
+  .report { min-height: 420px; }
+  .empty-report {
+    height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 13px; text-align: center; gap: 8px; padding: 0 40px;
+  }
+  .empty-report .glyph { font-size: 26px; opacity: .35; margin-bottom: 4px; }
+
+  /* --- vitals strip --- */
+  .vitals { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .vital { background: var(--card); padding: 16px 18px; border-right: 1px solid var(--line); }
+  .vital:last-child { border-right: none; }
+  .vital .k { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+  .vital .v { font-size: 19px; font-weight: 600; }
+  .vital .v.score-good { color: var(--explicit); }
+  .vital .v.score-mid { color: var(--inferred); }
+  .vital .v.score-low { color: var(--missing); }
+
+  /* --- segmented match bar, literally built from the skill outcomes --- */
+  .segbar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 4px; border: 1px solid var(--line); }
+  .seg { height: 100%; cursor: default; transition: opacity .15s; }
+  .seg.explicit { background: var(--explicit); }
+  .seg.inferred { background: var(--inferred); }
+  .seg.missing { background: #DDE0E7; }
+  .segbar.dim .seg { opacity: .35; }
+  .segbar .seg.hl { opacity: 1 !important; }
+  .seglegend { display: flex; gap: 14px; font-size: 10.5px; color: var(--muted); margin-bottom: 18px; }
+  .seglegend span { display: inline-flex; align-items: center; gap: 5px; }
+  .swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+  /* --- skill ledger --- */
+  .ledger-head { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .skillrow {
+    display: grid; grid-template-columns: 20px 1fr auto; gap: 10px; align-items: start;
+    padding: 11px 4px; border-bottom: 1px solid #EEF0F4; border-left: 3px solid transparent;
+    transition: background .12s, border-color .12s;
+  }
+  .skillrow:last-child { border-bottom: none; }
+  .skillrow.hl { background: #F7F8FB; border-left-color: var(--scan); }
+  .skillrow .icon { font-size: 13px; line-height: 1.6; text-align: center; }
+  .skillrow .name { font-weight: 600; font-size: 13.5px; }
+  .skillrow .evidence { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+  .skillrow .evidence .q { color: #3A4256; }
+  .statuspill {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 3px 8px;
+    border-radius: 999px; font-weight: 600; white-space: nowrap; height: fit-content;
+  }
+  .statuspill.explicit { background: var(--explicit-bg); color: var(--explicit); }
+  .statuspill.inferred { background: var(--inferred-bg); color: var(--inferred); }
+  .statuspill.missing { background: var(--missing-bg); color: var(--missing); }
+
+  .errbox { background: var(--missing-bg); color: var(--missing); border-radius: 8px; padding: 12px 14px; font-size: 12.5px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Resume Scan</h1>
+      <div class="sub">Paste one resume, list what the role needs, see exactly what's evidenced.</div>
+    </div>
+    <span class="tag mono">Single-shot · LLM read</span>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: intake -->
+    <div class="card">
+      <div class="eyebrow"><span class="n">1</span>Intake</div>
+
+      <label for="resumeText">Resume text</label>
+      <div class="hint">Paste the full resume — every section is read, start to end.</div>
+      <div class="intake-doc" id="intakeDoc">
+        <textarea id="resumeText" rows="12" placeholder="Paste the candidate's full resume here…"></textarea>
+        <div class="scanline"></div>
+      </div>
+
+      <label for="skillsInput">Required skills</label>
+      <div class="hint">Comma-separated. Matched by meaning, not by keyword.</div>
+      <textarea id="skillsInput" rows="3">Python, REST API design, Team leadership, SQL, Stakeholder communication</textarea>
+
+      <button class="btn-scan" id="scanBtn" onclick="runScan()">
+        <span class="dot"></span> Run scan
+      </button>
+    </div>
+
+    <!-- RIGHT: report -->
+    <div>
+      <div class="card report" id="reportCard">
+        <div class="eyebrow"><span class="n">2</span>Scan report</div>
+        <div id="reportBody">
+          <div class="empty-report">
+            <div class="glyph">◌</div>
+            <div>Nothing scanned yet.<br/>Paste a resume and required skills on the left, then run the scan.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = ""; // same-origin
+const API_KEY = "changeme"; // matches .env ATS_API_KEY for demo purposes
+
+function scoreClass(score) {
+  if (score >= 70) return "score-good";
+  if (score >= 40) return "score-mid";
+  return "score-low";
+}
+
+function statusIcon(status) {
+  if (status === "explicit") return "●";
+  if (status === "inferred") return "◐";
+  return "○";
+}
+
+async function runScan() {
+  const resumeText = document.getElementById("resumeText").value.trim();
+  const requiredSkills = document.getElementById("skillsInput").value
+    .split(",").map(s => s.trim()).filter(Boolean);
+
+  if (!resumeText) { alert("Paste a resume first."); return; }
+  if (!requiredSkills.length) { alert("Add at least one required skill."); return; }
+
+  const btn = document.getElementById("scanBtn");
+  const doc = document.getElementById("intakeDoc");
+  btn.disabled = true; btn.innerHTML = "<span class=\"dot\"></span> Scanning…";
+  doc.classList.remove("scanning"); void doc.offsetWidth; doc.classList.add("scanning");
+
+  try {
+    const res = await fetch(`${API}/resumes/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+      body: JSON.stringify({ resume_text: resumeText, required_skills: requiredSkills }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      renderError(data.error?.message || "Scan failed. Check the resume text and try again.");
+    } else {
+      renderReport(data);
+    }
+  } catch (err) {
+    renderError("Could not reach the scanning service. Is the backend running?");
+  } finally {
+    btn.disabled = false; btn.innerHTML = "<span class=\"dot\"></span> Run scan";
+  }
+}
+
+function renderError(message) {
+  document.getElementById("reportBody").innerHTML = `<div class="errbox">${message}</div>`;
+}
+
+function renderReport(data) {
+  const skills = data.skills_analysis || [];
+  const score = data.match_score ?? 0;
+
+  const segbar = skills.map((s, i) => {
+    const w = (100 / (skills.length || 1)).toFixed(3);
+    const cls = s.status === "explicit" ? "explicit" : s.status === "inferred" ? "inferred" : "missing";
+    return `<div class="seg ${cls}" style="width:${w}%" data-i="${i}"
+      onmouseenter="highlight(${i})" onmouseleave="unhighlight()"></div>`;
+  }).join("");
+
+  const rows = skills.map((s, i) => {
+    const cls = s.status;
+    const evidence = s.evidence
+      ? `<div class="evidence">Evidence: <span class="q">"${escapeHtml(s.evidence)}"</span></div>`
+      : `<div class="evidence">Not found in the resume.</div>`;
+    return `
+      <div class="skillrow" id="row-${i}" onmouseenter="highlight(${i})" onmouseleave="unhighlight()">
+        <div class="icon" style="color: var(--${cls === 'missing' ? 'missing' : cls});">${statusIcon(s.status)}</div>
+        <div>
+          <div class="name">${escapeHtml(s.skill)}</div>
+          ${evidence}
+        </div>
+        <div class="statuspill ${cls}">${s.status}</div>
+      </div>`;
+  }).join("");
+
+  document.getElementById("reportBody").innerHTML = `
+    <div class="vitals">
+      <div class="vital">
+        <div class="k">Total experience</div>
+        <div class="v">${data.total_experience_years} yrs</div>
+      </div>
+      <div class="vital">
+        <div class="k">Highest education</div>
+        <div class="v" style="font-size:15px;">${escapeHtml(data.highest_education || "—")}</div>
+      </div>
+      <div class="vital">
+        <div class="k">Match score</div>
+        <div class="v ${scoreClass(score)}">${score}%</div>
+      </div>
+    </div>
+
+    <div class="segbar" id="segbar">${segbar}</div>
+    <div class="seglegend">
+      <span><span class="swatch" style="background:var(--explicit)"></span>Explicit</span>
+      <span><span class="swatch" style="background:var(--inferred)"></span>Inferred</span>
+      <span><span class="swatch" style="background:#DDE0E7"></span>Missing</span>
+    </div>
+
+    <div class="ledger-head">Skill ledger — ${skills.length} required</div>
+    <div id="ledger">${rows}</div>
+  `;
+}
+
+function highlight(i) {
+  const bar = document.getElementById("segbar");
+  const row = document.getElementById(`row-${i}`);
+  if (bar) { bar.classList.add("dim"); bar.querySelector(`.seg[data-i="${i}"]`)?.classList.add("hl"); }
+  if (row) row.classList.add("hl");
+}
+function unhighlight() {
+  const bar = document.getElementById("segbar");
+  if (bar) { bar.classList.remove("dim"); bar.querySelectorAll(".seg").forEach(s => s.classList.remove("hl")); }
+  document.querySelectorAll(".skillrow.hl").forEach(r => r.classList.remove("hl"));
+}
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.innerText = str ?? "";
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  # Standalone ChromaDB server - only needed if CHROMA_MODE=server in .env
+  # (i.e. once you run more than one ats_backend replica sharing one index).
+  chromadb:
+    image: chromadb/chroma:0.5.5
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  ats_backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+    depends_on:
+      - chromadb
+    volumes:
+      - chroma_data:/app/chroma_data
+      - resume_storage:/app/storage/resumes
+
+volumes:
+  chroma_data:
+  resume_storage:
